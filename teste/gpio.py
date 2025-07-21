@@ -45,11 +45,11 @@ def digitalRead(pin):
     
     return lgpio.gpio_read(handle, pin)
 
-def setPWM(pin, duty_cycle_percent, frequency_hz=10000):
+def setPWM(pin, duty_cycle_percent, frequency_hz=1000):
     """
     Start PWM on a pin.
     - duty_cycle_percent: 0.0 to 100.0
-    - frequency_hz: PWM frequency (default 10000 Hz)
+    - frequency_hz: PWM frequency (default 1000 Hz)
     """
     if handle is None:
         raise RuntimeError("GPIO not initialized. Call init() first.")
