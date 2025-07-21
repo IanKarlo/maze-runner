@@ -62,7 +62,7 @@ def stopPWM(pin):
     if handle is None:
         raise RuntimeError("GPIO not initialized. Call init() first.")
     if pin in _pwm_pins:
-        lgpio.tx_pwm(handle, pin, 0, 0)
+        setPWM(pin, 0, 0)
         del _pwm_pins[pin]
 
 def cleanup():

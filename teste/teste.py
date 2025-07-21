@@ -1,15 +1,36 @@
 import gpio
 
+ENA = 12
+IN1 = 27
+IN2 = 22
+
+ENB = 12
+IN3 = 27
+IN4 = 22
+
 if gpio.init():
-    gpio.pinMode(13, 'out')
+    gpio.pinMode(ENA, 'out')
+    gpio.pinMode(IN1, 'out')
+    gpio.pinMode(IN2, 'out')
 
-    gpio.setPWM(13, 50.0)  # Start PWM at 50% duty cycle, 500 Hz
-    input("PWM running. Press Enter to change duty...")
+    gpio.digitalWrite(IN1, 1)
+    gpio.digitalWrite(IN2, 0)
 
-    # gpio.pwmChangeDutyCycle(13, 80.0)
-    # input("Duty changed to 80%. Press Enter to stop PWM...")
+    while True:
+        user_input = input("Enter new duty cycle (0-100) as an integer or 'exit' to quit: ")
 
-    name = input()
+        if user_input.lower() == 'exit':
+            break
 
-    gpio.stopPWM(13)
+        try:
+            duty_cycle = int(user_input)
+            if 0 <= duty_cycle <= 100:
+                print('duty_cycle:', duty_cycle)
+                gpio.setPWM(ENA, duty_cycle)
+            else:
+                print("Duty cycle must be an integer between 0 and 100.")
+        except ValueError:
+            print("Invalid input. Please enter an integer or 'exit'.")
+
+    gpio.stopPWM(ENA)
     gpio.cleanup()
