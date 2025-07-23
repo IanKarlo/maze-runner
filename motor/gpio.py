@@ -16,7 +16,7 @@ def init(chip=0):
         print(f"[GPIO INIT ERROR] {e}")
         return False
 
-def pinMode(pin, mode):
+def pin_mode(pin, mode):
     """
     Set a GPIO pin as input or output.
     mode: 'in' or 'out'
@@ -31,21 +31,21 @@ def pinMode(pin, mode):
     else:
         raise ValueError("Mode must be 'in' or 'out'.")
 
-def digitalWrite(pin, value):
+def digital_write(pin, value):
     """Set pin HIGH (1) or LOW (0)."""
     if handle is None:
         raise RuntimeError("GPIO not initialized. Call init() first.")
     
     lgpio.gpio_write(handle, pin, 1 if value else 0)
 
-def digitalRead(pin):
+def digital_read(pin):
     """Read and return digital value (0 or 1) from the pin."""
     if handle is None:
         raise RuntimeError("GPIO not initialized. Call init() first.")
     
     return lgpio.gpio_read(handle, pin)
 
-def setPWM(pin, duty_cycle_percent, frequency_hz=1000):
+def set_PWM(pin, duty_cycle_percent, frequency_hz=1000):
     """
     Start PWM on a pin.
     - duty_cycle_percent: 0.0 to 100.0
@@ -57,13 +57,21 @@ def setPWM(pin, duty_cycle_percent, frequency_hz=1000):
     lgpio.tx_pwm(handle, pin, frequency_hz, duty_cycle_percent)
     _pwm_pins[pin] = True
 
-def stopPWM(pin):
+def stop_PWM(pin):
     """Stop PWM on a pin."""
     if handle is None:
         raise RuntimeError("GPIO not initialized. Call init() first.")
     if pin in _pwm_pins:
         setPWM(pin, 0, 0)
         del _pwm_pins[pin]
+
+def generic_cbf(chip, gpio, level, timestamp) :
+    print(gpio, level, timestamp)
+
+
+def setup_interruptions(encoder_pin, cbf = generic_cbf):
+    lgpio.gpio_claim_alert(handle, encoder_pin, lgpio.RISING_EDGE)
+    lgpio.callback(handle, encoder_pin, lgpio.RISING_EDGE, cbf)
 
 def cleanup():
     """Release the GPIO handle and stop any PWM."""
