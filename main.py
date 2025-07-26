@@ -7,13 +7,7 @@ inc = 0
 
 
 def callback_function(chip, gpio, level, timestamp):
-    global incrementatorA, incrementatorB
-
     global inc
-    # if gpio == 20 or gpio == 21:
-    #     incrementatorA += 1
-    # if gpio == 5 or gpio == 6:
-    #     incrementatorB += 1
     inc += 1
     print(inc)
 
