@@ -2,16 +2,17 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from motor import pd
-from motor import motors_driver
+from drivers.motor import pd
+from drivers.motor import motors_driver
 
 class MotorControllerNode(Node):
     def __init__(self):
+        super().__init__('motor')
         self.motor_driver = motors_driver.MotorDriver(lambda chip, gpio, level, timestamp: self.get_pulses_encoders(chip, gpio, level, timestamp))
 
         self.linear_pd = pd.PDController(1, 1)
         self.angular_pd = pd.PDController(1, 1)
-        self.ds = 0.01 # 10 ms
+        self.ds = 0.04 # 10 ms
 
         self.v_setpoint = 0.0 # Velocidade linear desejada (m/s)
         self.w_setpoint = 0.0 # Velocidade angular desejada (rad/s)
@@ -65,7 +66,7 @@ class MotorControllerNode(Node):
 
         pwm_r = 100 if signal_r > 100 else -100 if signal_r < -100 else signal_r
         pwm_l = 100 if signal_l > 100 else -100 if signal_l < -100 else signal_l
-
+        print(pwm_r, pwm_l)
         self.motor_driver.run_motors(pwm_r, pwm_l)
         pass
          

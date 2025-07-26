@@ -26,13 +26,13 @@ class Motor():
     
     def run(self, duty_cycle = 50):
         if duty_cycle > 0:
-            gpio.digital_write(self.IN1, 0)
-            gpio.digital_write(self.IN2, 1)
-        else:
             gpio.digital_write(self.IN1, 1)
             gpio.digital_write(self.IN2, 0)
+        else:
+            gpio.digital_write(self.IN1, 0)
+            gpio.digital_write(self.IN2, 1)
 
-        gpio.set_PWM(self.ENA, duty_cycle)
+        gpio.set_PWM(self.ENA, abs(duty_cycle))
 
     
 

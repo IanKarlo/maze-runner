@@ -62,7 +62,7 @@ def stop_PWM(pin):
     if handle is None:
         raise RuntimeError("GPIO not initialized. Call init() first.")
     if pin in _pwm_pins:
-        setPWM(pin, 0, 0)
+        set_PWM(pin, 0, 0)
         del _pwm_pins[pin]
 
 def generic_cbf(chip, gpio, level, timestamp) :
@@ -77,7 +77,7 @@ def cleanup():
     """Release the GPIO handle and stop any PWM."""
     global handle
     for pin in list(_pwm_pins):
-        pwmStop(pin)
+        stop_PWM(pin)
     if handle is not None:
         lgpio.gpiochip_close(handle)
         handle = None
