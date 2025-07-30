@@ -10,6 +10,15 @@ class MotorControllerNode(Node):
         super().__init__('motor')
         self.motor_driver = motors_driver.MotorDriver(lambda chip, gpio, level, timestamp: self.get_pulses_encoders(chip, gpio, level, timestamp))
 
+        # Calcular quantos pulsos os encoders contam em 1 ds com PWM 100, (ou seja, essa será a v_max (pulse/ds) ).
+        # o teste: rodar por alguns segundos imprimindo DS, e ver os resultados do meio. Os do início e final ignora.
+        # sabendo disso, só faz sentido botar valores de v_setpoint abaixo desse valor máximo e o Ks dos PDs tem q serem geralmente limitados a esse v_max.
+        # p/ ds = 0.02s deu em volta de 32~36 pulsos por ds 
+        # Se tiver muito abaiixo ou muito alto, o K não está bom
+        # Mandar o robô ir pra frente, e ir ajustando apenas o KP, quando chegar num valor estável onde v = v_setpoint. 
+        # Aí começa a mexer no KD pra diminuir a variação de v com o que o KP conseguiu
+        # Depois faz o robô girar em torno do próprio eixo e vai mudando o KP angular. Quando chegar num valor semelahnte
+        # Resumindo. Vai saber que o PD tá bom quando vc mandar andar X e a velocidade medida dele se mantrr bem próxima de X
         self.linear_pd = pd.PDController(15, 0)
         self.angular_pd = pd.PDController(0, 0)
         self.ds = 0.02 # 10 ms
@@ -74,11 +83,12 @@ class MotorControllerNode(Node):
         print(u_r, u_l, v, w, signal_r, signal_l)
         self.motor_driver.run_motors(pwm_r, pwm_l)
 
-        self.stop_counter += self.ds
-        if self.stop_counter >= self.stop_time:
-            self.stop_counter = 0
-            self.v_setpoint = 0
-            self.w_setpoint = 0
+        # USADO APENAS EM TESTES PARA FAZER O MOTOR PARAR APÓS stop_time SEGUNDOS. NÃO FAZ PARTE DO CÓDIGO.
+        # self.stop_counter += self.ds
+        # if self.stop_counter >= self.stop_time:
+        #     self.stop_counter = 0
+        #     self.v_setpoint = 0
+        #     self.w_setpoint = 0
          
 
 def main(args=None):
