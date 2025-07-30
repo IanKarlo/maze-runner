@@ -10,9 +10,12 @@ class MotorControllerNode(Node):
         super().__init__('motor')
         self.motor_driver = motors_driver.MotorDriver(lambda chip, gpio, level, timestamp: self.get_pulses_encoders(chip, gpio, level, timestamp))
 
-        self.linear_pd = pd.PDController(1, 1)
-        self.angular_pd = pd.PDController(1, 1)
-        self.ds = 0.04 # 10 ms
+        self.linear_pd = pd.PDController(15, 0)
+        self.angular_pd = pd.PDController(0, 0)
+        self.ds = 0.02 # 10 ms
+
+        self.stop_counter = 0
+        self.stop_time = 5
 
         self.v_setpoint = 0.0 # Velocidade linear desejada (m/s)
         self.w_setpoint = 0.0 # Velocidade angular desejada (rad/s)
@@ -30,7 +33,6 @@ class MotorControllerNode(Node):
     
         self.timer = self.create_timer(self.ds, self.control_loop_callback)
         
-        pass
 
     def get_pulses_encoders(self, chip, gpio, level, timestamp):
         if gpio == 20 or gpio == 21:
@@ -43,10 +45,12 @@ class MotorControllerNode(Node):
 
 
     def cmd_vel_callback(self, msg):
-            # Twist.linear.x -> v
-            # Twist.angular.z -> w
-            self.v_setpoint = msg.linear.x
-            self.w_setpoint = msg.angular.z
+        # Twist.linear.x -> v
+        # Twist.angular.z -> w
+        self.v_setpoint = msg.linear.x
+        self.w_setpoint = msg.angular.z
+
+        self.stop_counter = 0           
 
     def control_loop_callback(self):
         # zera no início ou no f
@@ -55,20 +59,26 @@ class MotorControllerNode(Node):
         self.u_l = 0
         self.u_r = 0
 
-        v = (u_r + u_l)/2
-        w = (u_r - u_l)/2
+        v = (u_r + u_l)/2.0
+        w = (u_r - u_l)/2.0
         
-        control_v = self.linear_pd.compute(self.v_setpoint, v)
-        control_w = self.angular_pd.compute(self.w_setpoint, w)
+        control_v = self.linear_pd.compute(self.v_setpoint, v) # sinal de controle de ajuste da vel. linear
+        control_w = self.angular_pd.compute(self.w_setpoint, w) # sinal de controle de ajuste da vel. angular
 
-        signal_r = control_v + control_w
-        signal_l = control_v - control_w
+        signal_r = control_v + control_w # sinal de "PWM" a ser usado no motor direito
+        signal_l = control_v - control_w # sinal de "PWM" a ser usado no motor esquerdo
 
         pwm_r = 100 if signal_r > 100 else -100 if signal_r < -100 else signal_r
         pwm_l = 100 if signal_l > 100 else -100 if signal_l < -100 else signal_l
-        print(pwm_r, pwm_l)
+
+        print(u_r, u_l, v, w, signal_r, signal_l)
         self.motor_driver.run_motors(pwm_r, pwm_l)
-        pass
+
+        self.stop_counter += self.ds
+        if self.stop_counter >= self.stop_time:
+            self.stop_counter = 0
+            self.v_setpoint = 0
+            self.w_setpoint = 0
          
 
 def main(args=None):
