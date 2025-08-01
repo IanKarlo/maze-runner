@@ -7,8 +7,6 @@ from geometry_msgs.msg import Twist
 from drivers.motor import pd
 from drivers.motor import motors_driver
 
-class HaltException(Exception): pass
-
 class MotorControllerNode(Node):
     def __init__(self):
         super().__init__('motor')
@@ -85,7 +83,6 @@ class MotorControllerNode(Node):
         pwm_r = 20 if signal_r > 100 else -20 if signal_r < -100 else signal_r
         pwm_l = 20 if signal_l > 100 else -20 if signal_l < -100 else signal_l
 
-        #print(u_r, u_l, v, w, signal_r, signal_l)
         logger.info(
     "\nu_r: %s\nu_l: %s\nv: %s\nw: %s\nsignal_r: %s\nsignal_l: %s\n",
     u_r, u_l, v, w, signal_r, signal_l
@@ -105,14 +102,22 @@ def main(args=None):
     try:
         rclpy.init(args=args)
         node = MotorControllerNode()
-        logging.basicConfig(level=logging.INFO)
+        node.motor_driver.run_motors(0,0) 
+        logging.basicConfig(filename="ds.log",level=logging.INFO,  
+                            format='%(asctime)s - %(message)s',
+                            datefmt='%m-%d %H:%M:%S')
         logger.info('started\n')
         rclpy.spin(node)
-        logger.info('finished\n')
         node.destroy_node()
         rclpy.shutdown()
     except KeyboardInterrupt as h:
         node.motor_driver.run_motors(0,0) 
+        ans = input("Quer dar uma descricao para o log?[y/n]")
+        if ans == "y" or ans == "Y":
+            with open('ds.log', 'a') as file: # append mode
+                desc = input("Nome do log: ")
+                file.write(f"desc: {desc}")
+        logger.info('finished\n')
     
 
 if __name__ == '__main__':
