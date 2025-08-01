@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
+from venv import logger
 import rclpy
+import logging
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from drivers.motor import pd
 from drivers.motor import motors_driver
+
+class HaltException(Exception): pass
 
 class MotorControllerNode(Node):
     def __init__(self):
@@ -21,7 +25,7 @@ class MotorControllerNode(Node):
         # Resumindo. Vai saber que o PD tá bom quando vc mandar andar X e a velocidade medida dele se mantrr bem próxima de X
         self.linear_pd = pd.PDController(15, 0)
         self.angular_pd = pd.PDController(0, 0)
-        self.ds = 0.02 # 10 ms
+        self.ds = 0.02 # 10 ms, tempo de processamento de um ciclo da malha de controle
 
         self.stop_counter = 0
         self.stop_time = 5
@@ -31,6 +35,7 @@ class MotorControllerNode(Node):
 
         self.u_l = 0
         self.u_r = 0
+        self.r = 32 #32 +- 3mm raio da roda
 
         self.cmd_vel_subscriber = self.create_subscription(
             Twist,
@@ -77,10 +82,16 @@ class MotorControllerNode(Node):
         signal_r = control_v + control_w # sinal de "PWM" a ser usado no motor direito
         signal_l = control_v - control_w # sinal de "PWM" a ser usado no motor esquerdo
 
-        pwm_r = 100 if signal_r > 100 else -100 if signal_r < -100 else signal_r
-        pwm_l = 100 if signal_l > 100 else -100 if signal_l < -100 else signal_l
+        pwm_r = 20 if signal_r > 100 else -20 if signal_r < -100 else signal_r
+        pwm_l = 20 if signal_l > 100 else -20 if signal_l < -100 else signal_l
 
-        print(u_r, u_l, v, w, signal_r, signal_l)
+        #print(u_r, u_l, v, w, signal_r, signal_l)
+        logger.info(
+    "\nu_r: %s\nu_l: %s\nv: %s\nw: %s\nsignal_r: %s\nsignal_l: %s\n",
+    u_r, u_l, v, w, signal_r, signal_l
+        )
+
+
         self.motor_driver.run_motors(pwm_r, pwm_l)
 
         # USADO APENAS EM TESTES PARA FAZER O MOTOR PARAR APÓS stop_time SEGUNDOS. NÃO FAZ PARTE DO CÓDIGO.
@@ -89,15 +100,22 @@ class MotorControllerNode(Node):
         #     self.stop_counter = 0
         #     self.v_setpoint = 0
         #     self.w_setpoint = 0
-         
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = MotorControllerNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.init(args=args)
+        node = MotorControllerNode()
+        logging.basicConfig(level=logging.INFO)
+        logger.info('started\n')
+        rclpy.spin(node)
+        logger.info('finished\n')
+        node.destroy_node()
+        rclpy.shutdown()
+    except KeyboardInterrupt as h:
+        node.motor_driver.run_motors(0,0) 
     
 
 if __name__ == '__main__':
-    main()
+        main()
+
+
