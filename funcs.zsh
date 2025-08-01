@@ -1,5 +1,5 @@
 cp2pi() {
-  scp $1 robot@192.168.1.100 $2
+  scp $1 robot@192.168.1.100:$2
 }
 
 genssh() {
