@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
+import time
 from venv import logger
+from drivers.motor.gpio import digital_read
 import rclpy
+from math import fabs
 import logging
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from drivers.motor import pd
 from drivers.motor import motors_driver
 
+start = 0
+end  = 0
+started = 0
 class MotorControllerNode(Node):
     def __init__(self):
         super().__init__('motor')
@@ -25,8 +31,8 @@ class MotorControllerNode(Node):
         self.angular_pd = pd.PDController(0, 0)
         self.ds = 0.02 # 10 ms, tempo de processamento de um ciclo da malha de controle
 
-        self.stop_counter = 0
-        self.stop_time = 5
+        self.counter = 0
+        self.stop_time = 250 # aparenta ser 1s se for 50
 
         self.v_setpoint = 0.0 # Velocidade linear desejada (m/s)
         self.w_setpoint = 0.0 # Velocidade angular desejada (rad/s)
@@ -34,6 +40,12 @@ class MotorControllerNode(Node):
         self.u_l = 0
         self.u_r = 0
         self.r = 32 #32 +- 3mm raio da roda
+
+        self.motorA_state_enc1 = 0
+        self.motorA_state_enc2 = 0
+
+        self.motorB_state_enc1 = 0
+        self.motorB_state_enc2 = 0
 
         self.cmd_vel_subscriber = self.create_subscription(
             Twist,
@@ -83,13 +95,33 @@ class MotorControllerNode(Node):
         pwm_r = 20 if signal_r > 100 else -20 if signal_r < -100 else signal_r
         pwm_l = 20 if signal_l > 100 else -20 if signal_l < -100 else signal_l
 
+        # each HIGH means a transition, thus a pulse
+        self.motorA_state_enc1 += digital_read(20)
+        self.motorA_state_enc2 += digital_read(21)
+
+        self.motorB_state_enc1 += digital_read(5)
+        self.motorB_state_enc2 += digital_read(6)
+
+
+        # right and left DC wheel speed , translational and rotation velocity
         logger.info(
     "\nu_r: %s\nu_l: %s\nv: %s\nw: %s\nsignal_r: %s\nsignal_l: %s\n",
     u_r, u_l, v, w, signal_r, signal_l
         )
 
+        #Counting ammount of pulses per encoder in each motor
 
         self.motor_driver.run_motors(pwm_r, pwm_l)
+        if fabs(pwm_r) > 0 or fabs(pwm_l) >0 :
+            global start
+            start = time.time() if started == 0 else start # inicia contagem do timer
+            self.counter+=1
+        if self.counter >= self.stop_time:
+            end = time.time()
+            logger.info(
+                    "\npulses_enc1_motorA: %s\npulses_enc2_motorA: %s\npulses_enc1_motorB: %s\npulses_enc2_motorB: %s,took: %s ms\n",
+        self.motorA_state_enc1, self.motorA_state_enc2, self.motorB_state_enc1, self.motorB_state_enc2, (end - start)*1000) #ans in ms
+            raise KeyboardInterrupt("TIMEOUT!")
 
         # USADO APENAS EM TESTES PARA FAZER O MOTOR PARAR APÓS stop_time SEGUNDOS. NÃO FAZ PARTE DO CÓDIGO.
         # self.stop_counter += self.ds
