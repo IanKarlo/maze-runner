@@ -3,8 +3,8 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-largura_robo = 0.30              # Largura do robô em metros
-resolucao_angular = 10            # Tamanho de cada setor (graus)
+largura_robo = 0.65              # Largura do robô em metros
+resolucao_angular = 5            # Tamanho de cada setor (graus)
 num_setores = 360 // resolucao_angular  # Total de setores
 
 # === 1. Lê o CSV manualmente ===
