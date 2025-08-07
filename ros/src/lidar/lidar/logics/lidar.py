@@ -2,11 +2,11 @@ import os
 import ydlidar
 import time
 import sys
-from matplotlib.patches import Arc
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import numpy as np
 import serial
+import csv
+
+BAUDRATE = 230400
 
 def limpar_buffer_serial(porta="/dev/ttyUSB0", baudrate=115200):
     try:
@@ -19,28 +19,19 @@ def limpar_buffer_serial(porta="/dev/ttyUSB0", baudrate=115200):
     except Exception as e:
         print(f"Erro ao limpar buffer: {e}")
 
-
-RMAX = 32.0
-
-# Inicializa a figura e o gráfico polar
-fig = plt.figure()
-lidar_polar = plt.subplot(polar=True)
-lidar_polar.autoscale_view(True, True, True)
-lidar_polar.set_rmax(RMAX)
-lidar_polar.grid(True)
-
 # Lista portas e escolhe a primeira encontrada
 ports = ydlidar.lidarPortList()
 port = "/dev/ydlidar"
 for key, value in ports.items():
     port = value
-
-limpar_buffer_serial(port, 230400)
+print(f"Port {port}")
+# Limpa o buffer serial antes de iniciar
+limpar_buffer_serial(port, BAUDRATE)
 
 # Configuração do LIDAR
 laser = ydlidar.CYdLidar()
 laser.setlidaropt(ydlidar.LidarPropSerialPort, port)
-laser.setlidaropt(ydlidar.LidarPropSerialBaudrate, 230400)
+laser.setlidaropt(ydlidar.LidarPropSerialBaudrate, BAUDRATE)
 laser.setlidaropt(ydlidar.LidarPropLidarType, ydlidar.TYPE_TRIANGLE)
 laser.setlidaropt(ydlidar.LidarPropDeviceType, ydlidar.YDLIDAR_TYPE_SERIAL)
 laser.setlidaropt(ydlidar.LidarPropScanFrequency, 10.0)
@@ -62,13 +53,27 @@ try:
                     angle.append(point.angle)
                     ran.append(point.range)
                     intensity.append(point.intensity)
+                
+                print("Angles:", angle)
+                print("Range:", ran)
 
-                print(ran)
-except Exception:
-    pass
+                # Caminho dos arquivos
+                arquivo_csv = "dados_lidar.csv"
+
+                # Salva em CSV
+                with open(arquivo_csv, mode='w', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(["Angle", "Range"])
+                    for a, r in zip(angle, ran):
+                        writer.writerow([a, r])
+
+                print(f"Dados salvos em: {arquivo_csv}")
+
+except Exception as e:
+    print(f"Ocorreu um erro: {e}")
 finally:
+    # Encerra e desconecta o LIDAR com segurança
     laser.turnOff()
     time.sleep(1)
     laser.disconnecting()
     time.sleep(2)
-    plt.close()

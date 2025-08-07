@@ -5,7 +5,7 @@ from numpy import deg2rad, rad2deg
 import matplotlib.pyplot as plt
 
 
-if __name__ == "__main__":
+def main():
     #inicializando e configurando os dados do ydlidar
     my_laser= ydlidar.LaserScan()
     ydlidar.os_init()
@@ -44,27 +44,5 @@ if __name__ == "__main__":
             else:
                 print("Failed to get Lidar Data ")
         print(points)
-        if points:
-            last_scan = points[-1]  # Pegando o último conjunto de pontos
-
-            # Separando ângulos e distâncias
-            angles_deg, distances = zip(*last_scan)
-
-            # Convertendo ângulos para radianos
-            angles_rad = [deg2rad(a) for a in angles_deg]
-
-            # Criando figura polar
-            fig = plt.figure(figsize=(8, 8))
-            ax = fig.add_subplot(111, projection='polar')
-            ax.set_theta_zero_location('top')
-            ax.set_theta_direction(-1)
-
-            # Plotando os pontos
-            ax.scatter(angles_rad, distances, s=10, c='blue', alpha=0.75)
-
-            # Salvando a imagem
-            plt.title("Scan LIDAR - Formato Radar")
-            plt.savefig("lidar_scan.png")
-            print("Imagem salva como lidar_scan.png")
         laser.turnOff()
     laser.disconnecting()
