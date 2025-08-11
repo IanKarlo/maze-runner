@@ -1050,14 +1050,17 @@ def criar_vetor_distancias(angulos_rad, medidas, resolucao_angular):
     num_setores = 360 // resolucao_angular
     distancias = np.ones(num_setores) * 10.0  # valor alto = sem obstáculo
     for ang_rad, dist in zip(angulos_rad, medidas):
+        # Aplica offset de segurança
+        dist_segura = max(0, dist - 0.15)  # subtrai 15 cm, sem negativos
+        # dist_segura = dist
         ang_deg = math.degrees(ang_rad) % 360
         indice = int(ang_deg // resolucao_angular)
-        distancias[indice] = min(distancias[indice], dist)
+        distancias[indice] = min(distancias[indice], dist_segura)
 
     # Força obstáculos entre 90° e 270°
     for i, ang_deg in enumerate(np.arange(0, 360, resolucao_angular)):
         if 90 <= ang_deg < 270:
-            distancias[i] = 0.1  # simula obstáculo muito próximo
+            distancias[i] = 0  # simula obstáculo muito próximo
 
     return distancias
 
@@ -1103,12 +1106,17 @@ def escolher_direcao(densidade, distancias, largura_robo=0.30, objetivo_direcao=
     inicio, fim = melhor_bloco
     if fim >= inicio:
         centro = (inicio + fim) // 2
+        if (fim - inicio) % 2 == 0:
+            centro += 1
     else:
         # bloco que passa pelo zero (ex: setores 350°-10°)
         tamanho_bloco = ((fim + num_setores) - inicio + 1)
         centro = (inicio + tamanho_bloco // 2) % num_setores
 
-    return centro * resolucao_angular
+    if (fim - inicio) % 2 == 0:
+        return centro * resolucao_angular + (resolucao_angular / 2)
+
+    return centro * resolucao_angular 
 
 
 # === 5. Plotar gráficos lado a lado ===
@@ -1130,7 +1138,7 @@ def plotar_comparativo(angulos_rad, medidas, distancias_por_setor, direcao=None,
     axs[1].bar(angles, distancias_por_setor, width=larguras, bottom=0.0, alpha=0.6, edgecolor='black', align='edge', color='skyblue')
 
     if direcao is not None:
-        dir_rad = math.radians(direcao) + math.radians(resolucao_angular / 2)
+        dir_rad = math.radians(direcao)
         setor_index = int(direcao // resolucao_angular)
         distancia_sugerida = min(distancias_por_setor[setor_index], 1.7)
         print(f'distancia_sugerida={distancias_por_setor[setor_index]}')
@@ -1146,7 +1154,7 @@ def plotar_comparativo(angulos_rad, medidas, distancias_por_setor, direcao=None,
     plt.show()
 
 # === Execução principal ===
-arquivo_csv = "dados_lidar_old8.csv"
+arquivo_csv = "dados_lidar.csv"
 angulos_rad, medidas = ler_csv(arquivo_csv)
 distancias_por_setor = criar_vetor_distancias(angulos_rad, medidas, resolucao_angular)
 densidade = construir_histograma(distancias_por_setor)
