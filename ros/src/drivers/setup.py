@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'motor = drivers.ControladorBase:main',
+            'timer = drivers.TimedMove:main'
         ],
     },
 )
