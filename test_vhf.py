@@ -1066,7 +1066,7 @@ def criar_vetor_distancias(angulos_rad, medidas, resolucao_angular):
 
 
 # === 3. Histograma de densidade inversa ===
-def construir_histograma(distancias, limiar=1.5):
+def construir_histograma(distancias, limiar=1.5): 
     densidade = np.where(distancias < limiar, 1 / distancias, 0)
     return densidade
 
@@ -1078,10 +1078,15 @@ def diferenca_angular(angle1, angle2):
 def escolher_direcao(densidade, distancias, largura_robo=0.30, objetivo_direcao=0, resolucao_angular=10):
     num_setores = len(densidade)
 
-    # Marca setores livres (distância > largura do robô e não obstáculo)
+    # Marca setores livres
     livres = [dist > (largura_robo / 2) and dist > 0.1 for dist in distancias]
 
-    # Encontrar blocos contínuos de setores livres
+    # --- ALTERAÇÃO AQUI ---
+    # Reorganiza os setores para começar no índice correspondente a 270°
+    inicio_scan = int(270 // resolucao_angular)
+    livres = livres[inicio_scan:] + livres[:inicio_scan]
+
+    # Encontrar blocos contínuos
     blocos = []
     inicio = None
     for i in range(num_setores):
@@ -1092,31 +1097,35 @@ def escolher_direcao(densidade, distancias, largura_robo=0.30, objetivo_direcao=
             if inicio is not None:
                 blocos.append((inicio, i - 1))
                 inicio = None
-    # Caso o bloco vá até o final e conecte com o início (setores circulares)
     if inicio is not None:
         blocos.append((inicio, num_setores - 1))
 
     if not blocos:
-        return None  # nenhum setor livre
+        return None
 
-    # Encontrar o bloco mais largo
+    # Bloco mais largo
     melhor_bloco = max(blocos, key=lambda b: (b[1] - b[0] + 1) % num_setores)
-
-    # Calcula o centro do bloco
     inicio, fim = melhor_bloco
+
+    print(f'Blocos: {blocos}')
+    print(f'Melhor bloco: {melhor_bloco}')
+
+    # Centro do bloco
     if fim >= inicio:
         centro = (inicio + fim) // 2
-        if (fim - inicio) % 2 == 0:
+        if math.fabs(fim + inicio) % 2 == 1:
             centro += 1
     else:
-        # bloco que passa pelo zero (ex: setores 350°-10°)
         tamanho_bloco = ((fim + num_setores) - inicio + 1)
         centro = (inicio + tamanho_bloco // 2) % num_setores
 
-    if (fim - inicio) % 2 == 0:
-        return centro * resolucao_angular + (resolucao_angular / 2)
+    # --- DESFAZ O REORDENAMENTO ---
+    centro_original = (centro + inicio_scan) % num_setores
 
-    return centro * resolucao_angular 
+    if math.fabs(fim - inicio) % 2 == 0:
+        return centro_original * resolucao_angular + (resolucao_angular / 2)
+
+    return centro_original * resolucao_angular
 
 
 # === 5. Plotar gráficos lado a lado ===
