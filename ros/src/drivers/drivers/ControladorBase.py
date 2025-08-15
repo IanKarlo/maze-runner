@@ -1,48 +1,65 @@
 #!/usr/bin/env python3
-import time
-from venv import logger
-from drivers.motor.gpio import digital_read
 import rclpy
-from math import fabs
-import logging
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from drivers.motor import pd
 from drivers.motor import motors_driver
+from drivers.motor import gpio as gp
+import math
 
-# time_cummulative = []
+left_feedback_accumulator = [0,0,0,0,0]
+right_feedback_accumulator = [0,0,0,0,0]
+L = 0.225 #wheel distance
+d = L/2 #leia em cima
+r = 0.065/2 #wheel radius
+pulses_per_revolution = 1000
+direction_r = 1 # 1 forward | -1 backward
+direction_l = 1
+
+def map_range(x, in_min=-40, in_max=40, out_min=-100, out_max=100):
+    return ( (x - in_min) * (out_max - out_min) / (in_max - in_min) ) + out_min
+
+def calculate_velocity_in_pulses(v, w):
+    ul = (v - d*w)/r
+    ur = (v + d*w)/r
+    ul_pulses = ul*(pulses_per_revolution/(2*math.pi))
+    ur_pulses = ur*(pulses_per_revolution/(2*math.pi))
+
+    return ul_pulses, ur_pulses
+
+def control_loop(desired_velocity, measured_velocity, pd, accumulator_array, direction):
+    accumulator_array.append(measured_velocity)
+    if len(accumulator_array) > 5:
+        accumulator_array.pop(0)
+    measured_mean = sum(accumulator_array)/(len(accumulator_array))
+
+    control = pd.compute(desired_velocity, measured_mean)
+    control = map_range(control)
+    if direction == 1:
+        return 100 if control > 100 else 0 if control < 0 else control
+    else:
+        return -100 if control < -100 else 0 if control > 0 else control
+
+
 class MotorControllerNode(Node):
     def __init__(self):
         super().__init__('motor')
         self.motor_driver = motors_driver.MotorDriver(lambda chip, gpio, level, timestamp: self.get_pulses_encoders(chip, gpio, level, timestamp))
 
-        # Calcular quantos pulsos os encoders contam em 1 ds com PWM 100, (ou seja, essa será a v_max (pulse/ds) ).
-        # o teste: rodar por alguns segundos imprimindo DS, e ver os resultados do meio. Os do início e final ignora.
-        # sabendo disso, só faz sentido botar valores de v_setpoint abaixo desse valor máximo e o Ks dos PDs tem q serem geralmente limitados a esse v_max.
-        # p/ ds = 0.02s deu em volta de 32~36 pulsos por ds 
-        # Se tiver muito abaiixo ou muito alto, o K não está bom
-        # Mandar o robô ir pra frente, e ir ajustando apenas o KP, quando chegar num valor estável onde v = v_setpoint. 
-        # Aí começa a mexer no KD pra diminuir a variação de v com o que o KP conseguiu
-        # Depois faz o robô girar em torno do próprio eixo e vai mudando o KP angular. Quando chegar num valor semelahnte
-        # Resumindo. Vai saber que o PD tá bom quando vc mandar andar X e a velocidade medida dele se mantrr bem próxima de X
-        self.linear_pd = pd.PDController(15, 0)
-        self.angular_pd = pd.PDController(0, 0)
-        self.ds = 0.02 # 10 ms, tempo de processamento de um ciclo da malha de controle
+        self.left_pd = pd.PDController(3, 2.5)
+        self.right_pd = pd.PDController(2.8, 2.5)
+        self.ds = 0.02 # 10 ms
 
         self.stop_counter = 0
-        self.stop_time = 0.1 
+        self.stop_time = 5
 
         self.v_setpoint = 0.0 # Velocidade linear desejada (m/s)
         self.w_setpoint = 0.0 # Velocidade angular desejada (rad/s)
+        self.ul_setpoint = 0.0
+        self.ur_setpoint = 0.0
 
-        self.u_l = 0
-        self.u_r = 0
-
-        self.motorA_state_enc1 = 0
-        self.motorA_state_enc2 = 0
-
-        self.motorB_state_enc1 = 0
-        self.motorB_state_enc2 = 0
+        self.ul_measured = 0
+        self.ur_measured = 0
 
         self.cmd_vel_subscriber = self.create_subscription(
             Twist,
@@ -55,94 +72,58 @@ class MotorControllerNode(Node):
         self.timer = self.create_timer(self.ds, self.control_loop_callback)
         
 
+
     def get_pulses_encoders(self, chip, gpio, level, timestamp):
+    # Motor direito
         if gpio == 20 or gpio == 21:
-            self.u_r += 1
-            return
-        
-        if gpio == 5 or gpio == 6:
-            self.u_l += 1
-            return
+            self.ur_measured += 1 * direction_r
+
+        # Motor esquerdo
+        if gpio == 6 or gpio == 5:
+            self.ul_measured += 1 * direction_l
 
 
     def cmd_vel_callback(self, msg):
         # Twist.linear.x -> v
         # Twist.angular.z -> w
+        global direction_l
+        global direction_r
+
         self.v_setpoint = msg.linear.x
         self.w_setpoint = msg.angular.z
+        ul, ur = calculate_velocity_in_pulses(self.v_setpoint, self.w_setpoint)
+        self.ul_setpoint = ul * self.ds
+        self.ur_setpoint = ur * self.ds
+        direction_l = 1 if ul >= 0 else -1
+        direction_r = 1 if ur >= 0 else -1
 
         self.stop_counter = 0           
 
+
     def control_loop_callback(self):
-        # zera no início ou no f
-        u_l = self.u_l
-        u_r = self.u_r
-        self.u_l = 0
-        self.u_r = 0
+        ul_measured = self.ul_measured
+        ur_measured = self.ur_measured
+        ul_setpoint = self.ul_setpoint
+        ur_setpoint = self.ur_setpoint
 
-        v = (u_r + u_l)/2.0
-        w = (u_r - u_l)/2.0
-        
-        control_v = self.linear_pd.compute(self.v_setpoint, v) # sinal de controle de ajuste da vel. linear
-        control_w = self.angular_pd.compute(self.w_setpoint, w) # sinal de controle de ajuste da vel. angular
+        self.ul_measured = 0
+        self.ur_measured = 0
 
-        signal_r = control_v + control_w # sinal de "PWM" a ser usado no motor direito
-        signal_l = control_v - control_w # sinal de "PWM" a ser usado no motor esquerdo
-
-        pwm_r = 100 if signal_r > 100 else -100 if signal_r < -100 else signal_r
-        pwm_l = 100 if signal_l > 100 else -100 if signal_l < -100 else signal_l
-
-        # each HIGH means a transition, thus a pulse
-        self.motorA_state_enc1 += digital_read(20)
-        self.motorA_state_enc2 += digital_read(21)
-
-        self.motorB_state_enc1 += digital_read(5)
-        self.motorB_state_enc2 += digital_read(6)
-
-
-        # right and left DC wheel speed , translational and rotation velocity
-        logger.info(
-    "\nu_r: %s\nu_l: %s\nv: %s\nw: %s\nsignal_r: %s\nsignal_l: %s\n",
-    u_r, u_l, v, w, signal_r, signal_l
-        )
+        pwm_l = control_loop(ul_setpoint, ul_measured, self.left_pd, left_feedback_accumulator, direction_l)
+        pwm_r = control_loop(ur_setpoint, ur_measured, self.right_pd, right_feedback_accumulator, direction_r)
 
         self.motor_driver.run_motors(pwm_r, pwm_l)
-        self.stop_counter += self.ds
-        if self.stop_counter >= self.stop_time:
-            start = time.time()
-            end = time.time()
-            self.stop_counter = 0
-            self.v_setpoint = 0
-            self.w_setpoint = 0
-            logger.info(
-                    "\npulses_enc1_motorA: %s\npulses_enc2_motorA: %s\npulses_enc1_motorB: %s\npulses_enc2_motorB: %s,took: %s s\n",
-        self.motorA_state_enc1, self.motorA_state_enc2, self.motorB_state_enc1, self.motorB_state_enc2, end-start) #ans in ms
 
-        # USADO APENAS EM TESTES PARA FAZER O MOTOR PARAR APÓS stop_time SEGUNDOS. NÃO FAZ PARTE DO CÓDIGO.
+        print(f'ul_measured: {ul_measured} - ur_measured: {ur_measured} ----- ul_setpoint: {ul_setpoint} - ur_setpoint: {ur_setpoint} - pwm_l = {pwm_l} - pwm_r = {pwm_r}')
+         
 
 def main(args=None):
-    try:
-        rclpy.init(args=args)
-        node = MotorControllerNode()
-        node.motor_driver.run_motors(0,0) 
-        logging.basicConfig(filename="ds.log",level=logging.INFO,  
-                            format='%(asctime)s - %(message)s',
-                            datefmt='%m-%d %H:%M:%S')
-        logger.info('started\n')
-        rclpy.spin(node)
-        node.destroy_node()
-        rclpy.shutdown()
-    except KeyboardInterrupt as h:
-        node.motor_driver.run_motors(0,0) 
-        ans = input("Quer dar uma descricao para o log?[y/n]")
-        if ans == "y" or ans == "Y":
-            with open('ds.log', 'a') as file: # append mode
-                desc = input("Nome do log: ")
-                file.write(f"desc: {desc}")
-        logger.info('finished\n')
+    rclpy.init(args=args)
+    node = MotorControllerNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
     
 
 if __name__ == '__main__':
-        main()
-
-
+    main()
