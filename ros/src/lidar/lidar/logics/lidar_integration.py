@@ -50,4 +50,16 @@ def proccess_data():
     # Converte os ângulos para radianos e aplica o ajuste
     angles_rad = [math.pi + ang - math.pi/3 for ang in angles]
 
-    return angles_rad, ranges
+    # Filtro por ângulo após atualização
+    angulos_filtrados = []
+    distancias_filtradas = []
+    for ang, dist in zip(angles_rad, ranges):
+        ang_deg = math.degrees(ang) % 360
+        if not (90 <= ang_deg <= 270):
+            angulos_filtrados.append(ang)
+            distancias_filtradas.append(dist)
+
+    # Mantém tratamento de distâncias
+    distancias_filtradas = [0.3 if x <= 0 else x if x < 2 else 10.0 for x in distancias_filtradas]
+
+    return angulos_filtrados, distancias_filtradas
