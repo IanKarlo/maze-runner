@@ -28,7 +28,7 @@ class TimedMoverNode(Node):
         self.declare_parameter('angular_z', 1.0)     # rad/s
         self.declare_parameter('dt', 0.01)            # s (frequência de publicação de 10Hz)
         self.declare_parameter('duration', 0.45)      # s (tempo total de movimento)
-        self.declare_parameter('sectors', 6.0) #90 graus
+        self.declare_parameter('sectors', 1.0) #90 graus
 
         # --- Obtenção dos valores dos parâmetros ---
         self._linear_x = self.get_parameter('linear_x').get_parameter_value().double_value
@@ -92,7 +92,9 @@ class TimedMoverNode(Node):
             # --- Desativa o timer ---
             # Isso é crucial para que ele pare de publicar e usar recursos.
             self.timer_.cancel()
-            self.get_logger().info('Timer desativado. O nó permanecerá ativo mas inerte.')
+            self.get_logger().info('SHUTTING DOWN')
+            self.destroy_node()
+            rclpy.shutdown()
 
         # Incrementa o contador para o próximo ciclo
         self._current_count += 1

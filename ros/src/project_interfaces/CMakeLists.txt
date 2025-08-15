@@ -11,6 +11,7 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/LidarPoint.msg"
   "srv/LidarResponse.srv"
+  "srv/TimedMoveResponse.srv"
 )
 
 ament_package()

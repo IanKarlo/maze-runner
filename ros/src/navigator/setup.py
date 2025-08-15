@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'drivers'
+package_name = 'navigator'
 
 setup(
     name=package_name,
@@ -14,15 +14,12 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='sssf2',
-    maintainer_email='sssf2@todo.todo',
+    maintainer_email='samuelsimoes31@gmail.com',
     description='TODO: Package description',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'motor = drivers.ControladorBase:main',
-            'timer = drivers.ManualTimedMove:main',
-            'timed_move_service = drivers.TimedMoveService:main'
         ],
     },
 )
